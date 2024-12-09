@@ -1,3 +1,4 @@
+import __init__
 import pandas as pd
 import numpy as np
 import tensorflow as tf
@@ -9,50 +10,27 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 import keras_tuner as kt
 import os
 import sys
+from data import load_data, train_to_xy, val_to_xy
+import os
+import ast  # for safely evaluating string representations of lists
+from utils import comp_metrics, get_callbacks
 
-
-sys.stdout.reconfigure(encoding='utf-8')
-os.environ['PYTHONIOENCODING'] = 'utf-8'
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+version = 'v3'
+dir_path = os.path.dirname(os.path.abspath(__file__))
+data_path = os.path.join(dir_path, 'input/stocks_step4.csv')
+output_path = os.path.join(dir_path, f'output/{version}')
+hpo_path = os.path.join(output_path, 'hpo')
+model_path = os.path.join(output_path, 'model')
+log_path = os.path.join(output_path, 'logs')
+os.makedirs(output_path, exist_ok=True)
 
 # Daten laden
-df = pd.read_csv('input/stocks_step4.csv')
-mask = df.stock == 'AMZN'
-df = df[mask]
+td, vd = load_data(data_path, window_size=30)
 
-# Best val_loss So Far: 0.0026194197125732
+# Trainings- und Validierungsdaten in X und y aufteilen
+X_train, y_train = train_to_xy(td)
+X_val, y_val = val_to_xy(vd)
 
-# Konvertiere 'Date' in datetime-Format und sortiere nach Datum
-df['date'] = pd.to_datetime(df['date'])
-df = df.sort_values('date')
-
-# Nur das 'Close'-Feature für die Vorhersage verwenden
-close_prices = df['close'].values.reshape(-1, 1)
-
-# Daten normalisieren
-scaler = MinMaxScaler(feature_range=(0, 1))
-scaled_data = scaler.fit_transform(close_prices)
-
-# Trainings- und Testdatensätze erstellen
-def create_sequences(data, sequence_length):
-    X = []
-    y = []
-    for i in range(sequence_length, len(data)):
-        X.append(data[i-sequence_length:i, 0])
-        y.append(data[i, 0])
-    return np.array(X), np.array(y)
-
-sequence_length = 60  # 60 Tage als Eingabe für die Vorhersage
-X, y = create_sequences(scaled_data, sequence_length)
-
-# Daten in Trainings- und Testsets aufteilen
-train_size = int(len(X) * 0.8)
-X_train, X_test = X[:train_size], X[train_size:]
-y_train, y_test = y[:train_size], y[train_size:]
-
-# Daten für das LSTM-Modell anpassen
-X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
-X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
 
 # Funktion für das Modell mit Hyperparametern
 def build_model(hp):
@@ -69,7 +47,7 @@ def build_model(hp):
     model.add(Dropout(hp.Float('dropout_2', min_value=0.2, max_value=0.5, step=0.1)))
     
     # Dense Schicht
-    model.add(Dense(25))
+    model.add(Dense(32))
     model.add(Dense(1))
     
     # Lernrate
@@ -79,10 +57,10 @@ def build_model(hp):
     return model
 
 # Hyperparameter-Tuning mit Keras Tuner
-tuner = kt.Hyperband(build_model, objective='val_loss', max_epochs=10, factor=3, directory='hpt_v1', project_name='stock_price')
+tuner = kt.Hyperband(build_model, objective='val_loss', max_epochs=10, factor=3, directory=hpo_path, project_name='stock_price')
 
 # Modell suchen
-tuner.search(X_train, y_train, epochs=10, validation_data=(X_test, y_test))
+tuner.search(X_train, y_train, epochs=10, validation_data=(X_val, y_val))
 
 # Beste Hyperparameter ausgeben
 best_hyperparameters = tuner.get_best_hyperparameters(num_trials=1)[0]
@@ -90,40 +68,11 @@ print("Beste Hyperparameter:", best_hyperparameters)
 
 # Modell mit den besten Hyperparametern trainieren
 best_model = tuner.hypermodel.build(best_hyperparameters)
-history = best_model.fit(X_train, y_train, epochs=50, batch_size=64, validation_data=(X_test, y_test), verbose=0)
-
-# Verlust über Epochen visualisieren
-plt.figure(figsize=(10, 6))
-plt.plot(history.history['loss'], label='Trainingsverlust')
-plt.plot(history.history['val_loss'], label='Validierungsverlust')
-plt.title('Verlust über die Epochen')
-plt.xlabel('Epoche')
-plt.ylabel('Loss')
-plt.legend()
-plt.show()
-
-# Vorhersagen auf Testdaten
-y_pred = best_model.predict(X_test)
-
-# Werte zurückskalieren
-y_test_inverse = scaler.inverse_transform(y_test.reshape(-1, 1))
-y_pred_inverse = scaler.inverse_transform(y_pred)
-
-# Berechnung der Metriken
-mae = mean_absolute_error(y_test_inverse, y_pred_inverse)
-mse = mean_squared_error(y_test_inverse, y_pred_inverse)
-accuracy = 1 - np.mean(np.abs((y_test_inverse - y_pred_inverse) / y_test_inverse))  # Accuracy-Rate
-
-print(f"Mean Absolute Error (MAE): {mae}")
-print(f"Mean Squared Error (MSE): {mse}")
-print(f"Accuracy: {accuracy * 100:.2f}%")
-
-# Ergebnisse visualisieren
-plt.figure(figsize=(10, 6))
-plt.plot(df['date'].iloc[-len(y_test):], y_test_inverse, label='Echte Preise')
-plt.plot(df['date'].iloc[-len(y_test):], y_pred_inverse, label='Vorhergesagte Preise', linestyle='dashed', color='red')
-plt.title('Echte vs. Vorhergesagte Preise')
-plt.xlabel('Datum')
-plt.ylabel('Preis')
-plt.legend()
-plt.show()
+history = best_model.fit(
+    X_train, 
+    y_train, 
+    epochs=50, 
+    batch_size=64, 
+    validation_data=(X_val, y_val), 
+    callbacks=get_callbacks(model_path, log_path),
+    verbose=1)

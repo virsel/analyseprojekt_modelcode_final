@@ -18,10 +18,12 @@ dir_path = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(dir_path, 'input/stocks_step4.csv')
 
 
-def load_data(path=data_path, window_size=60):
+def load_data(path=data_path, window_size=30, only_goog=False):
     # Read data
     df = pd.read_csv(path)
-    df['tweet_embs'] = df['tweet_embs'].apply(lambda x: ast.literal_eval(x) if pd.notna(x) else [])
+    if only_goog:
+        mask = df.stock == 'GOOG'
+        df = df[mask]
     
     # Group the dataframe by stock
     grouped = df.groupby('stock')
@@ -37,7 +39,6 @@ def load_data(path=data_path, window_size=60):
         # Normalize close prices
         scaler = MinMaxScaler(feature_range=(0, 1))
         df_stock[['close']] = scaler.fit_transform(df_stock[['close']])
-        df_stock[['positive', 'negative', 'num_tweets']] = MinMaxScaler(feature_range=(0, 1)).fit_transform(df_stock[['positive', 'negative', 'num_tweets']])
 
         # Create training data for this stock
         td, vd = create_data(df_stock, window_size)
@@ -47,7 +48,7 @@ def load_data(path=data_path, window_size=60):
     return train_data, val_data 
 
 # Transform to list of tuples
-def create_data(df, window_size=60):
+def create_data(df, window_size=30):
     df = df.sort_values('date', ascending=True)
     numeric_columns = ['close']
     training_data = []
@@ -91,9 +92,12 @@ def val_to_xy(stock_data):
             y.append(data2[1])
     return np.array(X), np.array(y)
 
-def load_data_with_sent(path=data_path, window_size=60):
+def load_data_with_sent(path=data_path, window_size=30, only_goog=False):
     # Read data
     df = pd.read_csv(path)
+    if only_goog:
+        mask = df.stock == 'GOOG'
+        df = df[mask]
     df['tweet_embs'] = df['tweet_embs'].apply(lambda x: ast.literal_eval(x) if pd.notna(x) else [])
     
     # Group the dataframe by stock
@@ -120,7 +124,7 @@ def load_data_with_sent(path=data_path, window_size=60):
     return train_data, val_data 
 
 # Transform to list of tuples
-def create_data_with_sent(df, window_size=60):
+def create_data_with_sent(df, window_size=30):
     df = df.sort_values('date', ascending=True)
     sent_columns = ['positive', 'negative', 'num_tweets']
     numeric_columns = ['close']
@@ -147,9 +151,9 @@ def create_data_with_sent(df, window_size=60):
         data.append((X, y_regr))
         # Calculate target (1 if price rises, 0 if not)
     
-    # np.random.shuffle(data)
-    training_data = data[:-80]
-    val_data = data[-80:]
+    train_size = int(len(data) * 0.85)
+    training_data = data[:train_size]
+    val_data = data[train_size:]
     
     return training_data, val_data
 

@@ -4,15 +4,6 @@ import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 import json
 
-def plot_loss(history):
-    plt.figure(figsize=(10, 6))
-    plt.plot(history.history['loss'], label='Trainingsverlust')
-    plt.plot(history.history['val_loss'], label='Validierungsverlust')
-    plt.title('Verlust über die Epochen')
-    plt.xlabel('Epoche')
-    plt.ylabel('Loss')
-    plt.legend()
-    plt.show()
 
 def comp_metrics(scaler, y_val, y_pred, df):
     # Werte zurückskalieren

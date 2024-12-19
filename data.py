@@ -35,20 +35,27 @@ def load_data(path=data_path, window_size=30, only_goog=False):
     for stock, df_stock in grouped:
         # Reset the dataframe for this stock group
         df_stock = df_stock.reset_index(drop=True)
-
+        df_stock.sort_values('date', ascending=True)
+        
         # Normalize close prices
+        train_size = int(len(df_stock) * 0.85)
+        val_size = len(df_stock) - train_size
         scaler = MinMaxScaler(feature_range=(0, 1))
-        df_stock[['close']] = scaler.fit_transform(df_stock[['close']])
+        
+        df_stock.loc[:train_size - 1, 'close'] = scaler.fit_transform(df_stock.loc[:train_size - 1, 'close'].values.reshape(-1,1))
+        df_stock.loc[len(df_stock) - val_size:, 'close'] = scaler.transform(df_stock.loc[len(df_stock) - val_size:, 'close'].values.reshape(-1,1))
 
         # Create training data for this stock
-        td, vd = create_data(df_stock, window_size)
+        td, vd = create_data(df_stock, train_size, window_size)
+        
         train_data.extend(td)
+        
         val_data.append({'stock': stock, 'val_data': vd, 'scaler': scaler, 'df': df_stock})
     
     return train_data, val_data 
 
 # Transform to list of tuples
-def create_data(df, window_size=30):
+def create_data(df, train_size, window_size=30):
     df = df.sort_values('date', ascending=True)
     numeric_columns = ['close']
     training_data = []
@@ -65,7 +72,6 @@ def create_data(df, window_size=30):
         data.append((X_nums, y_regr))
 
     # Daten in Trainings- und Testsets aufteilen
-    train_size = int(len(data) * 0.85)
     training_data = data[:train_size]
     val_data = data[train_size:]
     
@@ -110,21 +116,31 @@ def load_data_with_sent(path=data_path, window_size=30, only_goog=False):
     for stock, df_stock in grouped:
         # Reset the dataframe for this stock group
         df_stock = df_stock.reset_index(drop=True)
-
+        df_stock.sort_values('date', ascending=True)
+        
         # Normalize close prices
+        train_size = int(len(df_stock) * 0.85)
+        val_size = len(df_stock) - train_size
+        
+        # scale close prices
         scaler = MinMaxScaler(feature_range=(0, 1))
-        df_stock[['close']] = scaler.fit_transform(df_stock[['close']])
-        df_stock[['positive', 'negative', 'num_tweets']] = MinMaxScaler(feature_range=(0, 1)).fit_transform(df_stock[['positive', 'negative', 'num_tweets']])
+        df_stock.loc[:train_size - 1, 'close'] = scaler.fit_transform(df_stock.loc[:train_size - 1, 'close'].values.reshape(-1,1))
+        df_stock.loc[len(df_stock) - val_size:, 'close'] = scaler.transform(df_stock.loc[len(df_stock) - val_size:, 'close'].values.reshape(-1,1))
+        
+        # scale sentiment values
+        scaler_sent = MinMaxScaler(feature_range=(0, 1))
+        df_stock.loc[:train_size - 1, ['positive', 'negative', 'num_tweets']] = scaler_sent.fit_transform(df_stock.loc[:train_size - 1,['positive', 'negative', 'num_tweets']].values.reshape(-1,3))
+        df_stock.loc[len(df_stock) - val_size:, ['positive', 'negative', 'num_tweets']] = scaler_sent.transform(df_stock.loc[len(df_stock) - val_size:,['positive', 'negative', 'num_tweets']].values.reshape(-1,3))
 
         # Create training data for this stock
-        td, vd = create_data_with_sent(df_stock, window_size)
+        td, vd = create_data_with_sent(df_stock, train_size, window_size)
         train_data.extend(td)
         val_data.append({'stock': stock, 'val_data': vd, 'scaler': scaler, 'df': df_stock})
     
     return train_data, val_data 
 
 # Transform to list of tuples
-def create_data_with_sent(df, window_size=30):
+def create_data_with_sent(df, train_size, window_size=30):
     df = df.sort_values('date', ascending=True)
     sent_columns = ['positive', 'negative', 'num_tweets']
     numeric_columns = ['close']
@@ -151,7 +167,6 @@ def create_data_with_sent(df, window_size=30):
         data.append((X, y_regr))
         # Calculate target (1 if price rises, 0 if not)
     
-    train_size = int(len(data) * 0.85)
     training_data = data[:train_size]
     val_data = data[train_size:]
     

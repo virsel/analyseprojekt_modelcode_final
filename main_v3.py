@@ -15,6 +15,7 @@ import os
 import ast  # for safely evaluating string representations of lists
 from utils import comp_metrics, get_callbacks
 
+# best loss: 0.00219
 version = 'v3'
 dir_path = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(dir_path, 'input/stocks_step4.csv')

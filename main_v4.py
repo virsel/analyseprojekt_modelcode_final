@@ -17,7 +17,7 @@ from utils import comp_metrics, get_callbacks
 from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, Conv1D, Flatten, Concatenate, MaxPooling1D
 from tensorflow.keras.models import Model
 
-
+# best loss: 0.00218
 version = 'v4'
 dir_path = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(dir_path, 'input/stocks_step4.csv')
@@ -41,26 +41,26 @@ def build_model(hp):
     # LSTM branch
     lstm_input = Input(shape=(X_train.shape[1], 1), name='lstm_input')
     lstm_layer = LSTM(
-        units=hp.Int('lstm1_units', min_value=16, max_value=128, step=16),
+        units=hp.Int('lstm1_units', min_value=8, max_value=64, step=16),
         return_sequences=False
     )(lstm_input)
     lstm_dropout = Dropout(
-        hp.Float(f'lstm1_dropout', min_value=0.2, max_value=0.5, step=0.1)
+        hp.Float(f'lstm1_dropout', min_value=0.1, max_value=0.3, step=0.1)
     )(lstm_layer)
     
 
     # CNN branch (replacing CNN)
-    cnn_input = Input(shape=(5, 771), name='cnn_input')
+    cnn_input = Input(shape=(10, 771), name='cnn_input')
     
     x = Conv1D(
-            filters=hp.Int(f'cnn_filters_1', min_value=4, max_value=16, step=4),
+            filters=hp.Int(f'cnn_filters_1', min_value=16, max_value=32, step=4),
             kernel_size=3,
             activation='elu',
             name=f'cnn_layer_1'
         )(cnn_input)
         
     x = Dropout(
-                hp.Float(f'cnn_dropout_1', min_value=0.2, max_value=0.5, step=0.1)
+                hp.Float(f'cnn_dropout_1',  min_value=0.1, max_value=0.3, step=0.1)
             )(x)
 
     x = Conv1D(
@@ -71,7 +71,18 @@ def build_model(hp):
     )(x)
     
     x = Dropout(
-            hp.Float(f'cnn_dropout_2', min_value=0.2, max_value=0.5, step=0.1)
+            hp.Float(f'cnn_dropout_2',  min_value=0.1, max_value=0.3, step=0.1)
+        )(x)
+    
+    x = Conv1D(
+        filters=hp.Int(f'cnn_filters_3', min_value=2, max_value=14, step=4),
+        kernel_size=3,
+        activation='elu',
+        name=f'cnn_layer_3'
+    )(x)
+    
+    x = Dropout(
+            hp.Float(f'cnn_dropout_3',  min_value=0.1, max_value=0.3, step=0.1)
         )(x)
 
     cnn_flatten = Flatten()(x)
@@ -80,15 +91,14 @@ def build_model(hp):
     concatenated = Concatenate()([lstm_dropout, cnn_flatten])
     
     # Dense layers
-    dense_layer1 = Dense(hp.Int(f'dense_layer1', min_value=32, max_value=64, step=32), activation='relu')(concatenated)
-    dense_layer2 = Dense(hp.Int(f'dense_layer1', min_value=16, max_value=32, step=16), activation='relu')(dense_layer1)
-    output_layer = Dense(1)(dense_layer2)
+    dense_layer1 = Dense(hp.Int(f'dense_layer1', min_value=32, max_value=64, step=16), activation='relu')(concatenated)
+    output_layer = Dense(1)(dense_layer1)
     
     # Create the model
     model = Model(inputs=[lstm_input, cnn_input], outputs=output_layer)
     
     # Compile the model
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=hp.Float('learning_rate', min_value=1e-5, max_value=1e-2, step=1e-5)),
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=hp.Float('learning_rate', min_value=1e-5, max_value=1e-3, step=1e-5)),
                   loss='mean_squared_error')
     
     return model
@@ -97,10 +107,10 @@ def build_model(hp):
 tuner = kt.Hyperband(build_model, objective='val_loss', max_epochs=10, factor=3, directory=hpo_path, project_name='stock_price')
 
 X_train_lstm = X_train[:, :, 0:1]  # First feature for LSTM
-X_train_cnn = X_train[:, :5, 1:]   # Features 1-3 for CNN
+X_train_cnn = X_train[:, :10, 1:]   # Features 1-3 for CNN
 
 X_val_lstm = X_val[:, :, 0:1]  # First feature for LSTM
-X_val_cnn = X_val[:, :5, 1:]   # Features 1-3 for CNN
+X_val_cnn = X_val[:, :10, 1:]   # Features 1-3 for CNN
 
 # Modell suchen
 tuner.search([X_train_lstm, X_train_cnn], y_train, epochs=10, validation_data=([X_val_lstm, X_val_cnn], y_val))

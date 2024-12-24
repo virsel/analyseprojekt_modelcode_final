@@ -17,7 +17,7 @@ from utils import comp_metrics, get_callbacks
 from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, Conv1D, Flatten, Concatenate, MaxPooling1D
 from tensorflow.keras.models import Model
 
-# best loss: 0.00218
+# best loss: 0.00201
 version = 'v4'
 dir_path = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(dir_path, 'input/stocks_step4.csv')

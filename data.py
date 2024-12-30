@@ -25,6 +25,8 @@ def load_data(path=data_path, window_size=30, only_goog=False):
         mask = df.stock == 'GOOG'
         df = df[mask]
     
+    df['date'] = pd.to_datetime(df['date'])
+    
     # Group the dataframe by stock
     grouped = df.groupby('stock')
 
@@ -105,6 +107,8 @@ def load_data_with_sent(path=data_path, window_size=30, only_goog=False):
         mask = df.stock == 'GOOG'
         df = df[mask]
     df['tweet_embs'] = df['tweet_embs'].apply(lambda x: ast.literal_eval(x) if pd.notna(x) else [])
+    
+    df['date'] = pd.to_datetime(df['date'])
     
     # Group the dataframe by stock
     grouped = df.groupby('stock')

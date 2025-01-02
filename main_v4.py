@@ -17,7 +17,7 @@ from utils import comp_metrics, get_callbacks
 from tensorflow.keras.layers import Input, LSTM, Dense, Dropout, Conv1D, Flatten, Concatenate, MaxPooling1D
 from tensorflow.keras.models import Model
 
-# best loss: 0.00201
+# best loss: 0.00320
 version = 'v4'
 dir_path = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(dir_path, 'input/stocks_step4.csv')
@@ -28,7 +28,7 @@ log_path = os.path.join(output_path, 'logs')
 os.makedirs(output_path, exist_ok=True)
 
 # Daten laden
-td, vd = load_data_with_sent(data_path, window_size=30)
+td, vd, _ = load_data_with_sent(data_path, window_size=30)
 
 # Trainings- und Validierungsdaten in X und y aufteilen
 X_train, y_train = train_to_xy(td)

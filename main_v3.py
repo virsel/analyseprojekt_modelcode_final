@@ -26,7 +26,7 @@ log_path = os.path.join(output_path, 'logs')
 os.makedirs(output_path, exist_ok=True)
 
 # Daten laden
-td, vd = load_data(data_path, window_size=30)
+td, vd, _ = load_data(data_path, window_size=30)
 
 # Trainings- und Validierungsdaten in X und y aufteilen
 X_train, y_train = train_to_xy(td)
@@ -40,19 +40,19 @@ def build_model(hp):
     # Erste LSTM-Schicht
     model.add(LSTM(units=hp.Int('units_1', min_value=32, max_value=128, step=32), 
                    return_sequences=True, input_shape=(X_train.shape[1], 1)))
-    model.add(Dropout(hp.Float('dropout_1', min_value=0.2, max_value=0.5, step=0.1)))
+    model.add(Dropout(hp.Float('dropout_1', min_value=0.1, max_value=0.3, step=0.1)))
     
     # Zweite LSTM-Schicht
     model.add(LSTM(units=hp.Int('units_2', min_value=32, max_value=128, step=32), 
                    return_sequences=False))
-    model.add(Dropout(hp.Float('dropout_2', min_value=0.2, max_value=0.5, step=0.1)))
+    model.add(Dropout(hp.Float('dropout_2', min_value=0.1, max_value=0.3, step=0.1)))
     
     # Dense Schicht
-    model.add(Dense(32))
+    model.add(Dense(hp.Int(f'dense_layer1', min_value=32, max_value=64, step=32), activation='relu'))
     model.add(Dense(1))
     
     # Lernrate
-    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=hp.Float('learning_rate', min_value=1e-5, max_value=1e-2, step=1e-5)),
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=hp.Float('learning_rate', min_value=1e-5, max_value=1e-3, step=1e-5)),
                   loss='mean_squared_error')
     
     return model

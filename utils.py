@@ -9,6 +9,7 @@ import tensorflow as tf
 from matplotlib import pyplot as plt
 import pandas as pd
 import matplotlib.dates as mdates
+from tensorflow.keras.callbacks import ReduceLROnPlateau
 
 
 
@@ -77,11 +78,11 @@ def get_callbacks(model_save_path, log_dir):
     # Optional: Early stopping to prevent overfitting
     early_stopping = EarlyStopping(
         monitor='val_loss', 
-        patience=10, 
+        patience=20, 
         restore_best_weights=True
     )
     
-        # TensorBoard Callback
+    # TensorBoard Callback
     tensorboard_callback = TensorBoard(
         log_dir=log_dir,
         histogram_freq=1,  # Log histogram of weights
@@ -90,7 +91,16 @@ def get_callbacks(model_save_path, log_dir):
         update_freq='epoch'  # Log at every epoch
     )
     
-    return [model_checkpoint, early_stopping, tensorboard_callback]
+    # Define the callback to reduce learning rate based on validation loss
+    reduce_lr = ReduceLROnPlateau(
+        monitor='val_loss',           # Metric to monitor
+        factor=0.7,               # Factor by which the learning rate will be reduced
+        patience=7,               # Number of epochs with no improvement to wait
+        min_lr=1e-5,              # Minimum learning rate
+        verbose=1                 # Print updates when learning rate changes
+    )
+    
+    return [model_checkpoint, early_stopping, tensorboard_callback, reduce_lr]
 
 
 
@@ -193,3 +203,7 @@ def plot_multiple_training_runs(log_dirs, labels, tag='epoch_loss'):
     plt.tight_layout()
     
     return plt.gcf()
+
+
+
+
